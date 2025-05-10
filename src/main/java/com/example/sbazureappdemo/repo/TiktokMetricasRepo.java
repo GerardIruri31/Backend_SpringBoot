@@ -276,7 +276,7 @@ public class TiktokMetricasRepo {
         }
     }
     
-    public Map<String,Object> uploadRecordsExcelFileConnection(Map<String,Object> response) {
+    public Map<String,Object> uploadRecordsExcelFileConnection(Map<String,Object> response, String userId) {
          // Obtener nombres de las columnas de forma dinámica
         try {
             logger.info("Iniciando guardado de datos del Excel importado.");
@@ -288,7 +288,10 @@ public class TiktokMetricasRepo {
             logger.error("No records to process");
             return Map.of("error", "No records to process");
         }
-
+        
+        for (Map<String, Object> record : records) {
+            record.put("codusuarioauditoria", userId);
+        }
         Set<String> columnNames = new HashSet<>(records.get(0).keySet());
         String tableName = (String) response.getOrDefault("table", "tabla_default");
 
@@ -335,7 +338,7 @@ public class TiktokMetricasRepo {
         %s;
     """, tableName, columns, placeholders, conflictClause);
 
-    
+
     jdbc.batchUpdate(sql, records, records.size(), (ps, record) -> {
         int index = 1;
         for (String col : columnNames) {
@@ -396,7 +399,11 @@ public class TiktokMetricasRepo {
             SELECT
                 T.codposteador, T.nbrPosteador, T.fecinicioperiodometa, T.fecfinperiodometa, T.numpostemeta,
                 R.ctdPublicaciones as numpostereal, 
-                ROUND((CAST(R.ctdPublicaciones AS NUMERIC)/CAST(T.numpostemeta AS NUMERIC))*100,2) AS Eficacia,
+
+                CASE
+                    WHEN T.numpostemeta = 0 THEN 0
+                    ELSE ROUND((CAST(R.ctdPublicaciones AS NUMERIC)/CAST(T.numpostemeta AS NUMERIC))*100,0)
+                END AS Eficacia,
                 R.promNumviews, R.promNumlikes, R.promNumsaves, 
                 R.promNumreposts, R.promNumcomments, R.promNumengagement, R.promInteraction
             FROM
@@ -416,10 +423,10 @@ public class TiktokMetricasRepo {
             LEFT JOIN
             (
                 select A.codposteador, count(a.codpublicacion) ctdPublicaciones, 
-                        ROUND(avg(a.numviews),2) as promNumviews, ROUND(avg(a.numlikes),2) as promNumlikes, ROUND(avg(a.numsaves),2) as promNumsaves, 
+                        ROUND(avg(a.numviews),0) as promNumviews, ROUND(avg(a.numlikes),2) as promNumlikes, ROUND(avg(a.numsaves),2) as promNumsaves, 
                         ROUND(avg(a.numreposts),2) as promNumreposts, ROUND(avg(a.numcomments),2) as promNumcomments,
                         ROUND(avg(a.numengagement),2) as promNumengagement,
-                        ROUND(avg(a.numinteractions),2) as promInteraction
+                        ROUND(avg(a.numinteractions),0) as promInteraction
                 FROM
                     (
                     select 
@@ -483,9 +490,9 @@ public class TiktokMetricasRepo {
             ) T
             LEFT JOIN  (
 	            select A.codautora, count(A.codpublicacion) ctdPublicaciones, 
-                        ROUND(avg(A.numviews),2) as promNumviews, ROUND(avg(A.numlikes),2) as promNumlikes, ROUND(avg(A.numsaves),2) as promNumsaves, 
+                        ROUND(avg(A.numviews),0) as promNumviews, ROUND(avg(A.numlikes),2) as promNumlikes, ROUND(avg(A.numsaves),2) as promNumsaves, 
                         ROUND(avg(A.numreposts),2) as promNumreposts, ROUND(avg(A.numcomments),2) as promNumcomments,
-                        ROUND(avg(A.numengagement),2) as promNumengagement, ROUND(avg(a.numinteractions),2) as promInteraction
+                        ROUND(avg(A.numengagement),0) as promNumengagement, ROUND(avg(a.numinteractions),0) as promInteraction
 	            FROM  (
                         select 
                             mp.codpublicacion, mp.codautora, mp.fecpublicacion, mp.horapublicacion,

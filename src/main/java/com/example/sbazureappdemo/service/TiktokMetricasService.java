@@ -51,8 +51,8 @@ public class TiktokMetricasService {
         return output;
     }
 
-    public Map<String,Object> uploadRecordsExcelFile(Map<String,Object> response) {
-        return repo.uploadRecordsExcelFileConnection(response);
+    public Map<String,Object> uploadRecordsExcelFile(Map<String,Object> response,String userId) {
+        return repo.uploadRecordsExcelFileConnection(response,userId);
     }
 
 

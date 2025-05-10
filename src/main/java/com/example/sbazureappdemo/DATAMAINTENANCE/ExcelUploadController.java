@@ -21,10 +21,13 @@ public class ExcelUploadController {
     }
 
     @PostMapping("/uploadexcel")
-    public Map<String, Object> uploadExcelFile(@RequestParam("file") MultipartFile file) {
+    public Map<String, Object> uploadExcelFile(@RequestParam("file") MultipartFile file, @RequestParam("userId") String userId) {
         try {
+            if (userId == null || userId.isBlank()) {
+                userId = "sistema";
+            }
             logger.info("📥 Excel recibido correctamente en el backend");
-            return excelUploadRenderer.processExcelFile(file);
+            return excelUploadRenderer.processExcelFile(file,userId);
         }
         catch (Exception e) {
             logger.error("Error: (DataMaintenance, UploadExcel)",e);

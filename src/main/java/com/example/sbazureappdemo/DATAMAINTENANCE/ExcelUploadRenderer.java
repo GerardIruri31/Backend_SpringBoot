@@ -23,7 +23,7 @@ public class ExcelUploadRenderer {
     public ExcelUploadRenderer(TiktokMetricasService tiktokMetricasService) {
         this.tiktokMetricasService = tiktokMetricasService;
     }
-    public Map<String, Object> processExcelFile(MultipartFile file) {
+    public Map<String, Object> processExcelFile(MultipartFile file, String userId) {
         Map<String, Object> response = new LinkedHashMap<>();
         List<Map<String, Object>> records = new ArrayList<>();
 
@@ -151,7 +151,7 @@ public class ExcelUploadRenderer {
                 return response;
             }
             //logger.info("Registros procesados: " + response);
-            return tiktokMetricasService.uploadRecordsExcelFile(response);
+            return tiktokMetricasService.uploadRecordsExcelFile(response,userId);
 
         } catch (IOException e) {
             response.put("error", "Error procesando el archivo Excel: " + e.getMessage());
