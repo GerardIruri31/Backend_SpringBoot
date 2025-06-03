@@ -96,4 +96,17 @@ public class TiktokMetricasService {
         return repo.getLastProcessedDataFromApifyConnection(startDate,finishDate, accountList);
     }
 
+
+
+    public List<Map<String,Object>> getDbSceneScore(FiltrosRequestDB request) {
+        logger.info("Inicio del proceso DB Query Score Scene");
+        return repo.scoreSceneConnectionV2(request);
+    }
+
+
+    public List<Map<String,Object>> getDbReporteConciso(FiltrosRequestDB request) {
+        logger.info("Inicio del proceso DB Query Reporte Conciso");
+        return repo.reporteConcisoConnectionV2(request);
+    }
+
 }

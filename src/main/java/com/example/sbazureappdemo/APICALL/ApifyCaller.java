@@ -29,7 +29,7 @@ public class ApifyCaller {
             // Crear el diccionario (mapa) con los datos correctamente nombrados
             Map<String, Object> jsonInput = new HashMap<>();
             //String ApifyToken = "apify_api_Q7ncoyOhWxO9TGqE1fCBVJcLPCugWJ35zHeQ";
-            logger.info("Apifytoken: " + ApifyToken);
+            //logger.info("Apifytoken: " + ApifyToken);
             jsonInput.put("ApiToken", ApifyToken);
             jsonInput.put("StartDate", StartDate);
             jsonInput.put("FinishDate", FinishDate);

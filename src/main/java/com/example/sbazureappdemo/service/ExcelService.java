@@ -82,6 +82,13 @@ public class ExcelService {
             numericStyle.setAlignment(HorizontalAlignment.CENTER);
             numericStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
+
+            // === Estilo PORCENTAJE ENTERO (0%) para "Engagement rate" ===
+            CellStyle porcentajeStyle = workbook.createCellStyle();
+            porcentajeStyle.setDataFormat(format.getFormat("0.00\\%"));  
+            porcentajeStyle.setAlignment(HorizontalAlignment.CENTER);
+            porcentajeStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
             // Añadir los datos al Excel
             int rowIndex = 1; // La fila 0 es para cabeceras
             for (Map<String, Object> rowData : data) {
@@ -91,11 +98,32 @@ public class ExcelService {
                     String columnName = columns.get(col);
                     Object value = rowData.get(columns.get(col));
                     if (value != null) {
-
-                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Engagement rate".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName)) {
+                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName)) {
                             if (value instanceof Number) {
                                 cell.setCellValue(((Number) value).doubleValue());
                                 cell.setCellStyle(numericStyle);
+                            }
+                        }
+
+
+                        // Si la columna es EXACTAMENTE “Engagement rate”, la tratamos como PORCENTAJE
+                        else if ("Engagement rate".equalsIgnoreCase(columnName)) {
+                            if (value instanceof Number) {
+                                double raw = ((Number) value).doubleValue();
+                                // POI espera que si queremos 43 %, la celda contenga 0.43
+                                cell.setCellValue(raw);  
+                                cell.setCellStyle(porcentajeStyle);
+                            } else {
+                                // Si viene como String, intentamos parsear
+                                try {
+                                    double raw = Double.parseDouble(value.toString());
+                                    cell.setCellValue(raw);
+                                    cell.setCellStyle(porcentajeStyle);
+                                } catch (NumberFormatException ex) {
+                                    // Si no se puede parsear, lo dejamos como texto para evitar excepción
+                                    cell.setCellValue(value.toString());
+                                    cell.setCellStyle(contenidoStyle);
+                                }
                             }
                         }
                         // Si la columna es "Date posted" o "Tracking date"

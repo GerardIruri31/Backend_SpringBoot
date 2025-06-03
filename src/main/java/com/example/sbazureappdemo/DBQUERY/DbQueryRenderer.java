@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.example.sbazureappdemo.service.TiktokMetricasService;
+import java.sql.SQLException;
 
 
 @Component
@@ -19,8 +20,9 @@ public class DbQueryRenderer {
         this.tiktokMetricasService = tiktokMetricasService;
     }
     public List<Map<String,Object>> filtrarDatos (FiltrosRequestDB request) {  
-        lastProcessedData.clear(); // Evita acumulación de datos de ejecuciones anteriores  
-        lastProcessedData = tiktokMetricasService.filterRegistries(request);  
+        lastProcessedData.clear(); // Evita acumulación de datos de ejecuciones anteriores 
+        List<Map<String, Object>> resultado = tiktokMetricasService.filterRegistries(request);
+        lastProcessedData.addAll(resultado); 
         return lastProcessedData;
     }
 
@@ -28,6 +30,30 @@ public class DbQueryRenderer {
     public List<Map<String, Object>> getLastProcessedData() {
         if (lastProcessedData.isEmpty()) {
             logger.info("No hay datos procesados aún.");
+        }
+        return lastProcessedData;
+    }
+
+
+    public List<Map<String, Object>> scoreScenesService(FiltrosRequestDB request) throws SQLException {
+        lastProcessedData.clear(); // Evita acumulación de datos de ejecuciones anteriores  
+        List<Map<String, Object>> resultado = tiktokMetricasService.getDbSceneScore(request);
+        lastProcessedData.addAll(resultado);
+        if (lastProcessedData.isEmpty()) {
+            logger.info("No hay datos que hagan match con filtros.");
+        } 
+        return lastProcessedData;
+    }
+
+
+
+
+    public List<Map<String, Object>> reporteConcisoService(FiltrosRequestDB request) throws SQLException {
+        lastProcessedData.clear();
+        List<Map<String, Object>> resultado = tiktokMetricasService.getDbReporteConciso(request);
+        lastProcessedData.addAll(resultado);
+        if (lastProcessedData.isEmpty()) {
+            logger.info("No hay datos que hagan match con filtros.");
         }
         return lastProcessedData;
     }

@@ -1,6 +1,10 @@
 package com.example.sbazureappdemo.DBQUERY;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
+
+import java.sql.SQLException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +39,52 @@ public class DatabaseQueryController {
     public List<Map<String, Object>> filtrarDatos(@RequestBody Map<String,Object> filtros) {
         try {
             FiltrosRequestDB request = mapToFiltrosRequest(filtros);
-            logger.info("📥 Datos recibidos en el backend: " + filtros);
+            logger.info("📥 Datos recibidos en el backend DB QUERY: " + filtros);
             return dbQueryRenderer.filtrarDatos(request);
         } catch (Exception e) {
             logger.error("Error al filtrar datos",e);
             return List.of();
         }
     }
+
+    @PostMapping("/scorescene")
+    public ResponseEntity<?> getScoreScene(@RequestBody Map<String,Object> filtros) {
+        try {
+            FiltrosRequestDB request = mapToFiltrosRequest(filtros);
+            logger.info("📥 Datos recibidos en el backend SCORE SCENES: " + filtros);
+            // Devuelve List<Map<String, Object>>
+            return ResponseEntity.ok(dbQueryRenderer.scoreScenesService(request));
+        } catch (SQLException e) {
+            logger.error("Error SQL Exception: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error Interno Score Scenes: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error al filtrar datos SCORE SCENES: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error Interno Score Scenes: " + e.getMessage());
+        }
+    }
+
+
+    @PostMapping("/conciso")
+    public ResponseEntity<?> getReporteConciso(@RequestBody Map<String,Object> filtros) {
+        try {
+            FiltrosRequestDB request = mapToFiltrosRequest(filtros);
+            logger.info("📥 Datos recibidos en el backend SHORT CONCISO: " + filtros);
+            // Devuelve List<Map<String, Object>>
+            return ResponseEntity.ok(dbQueryRenderer.reporteConcisoService(request));
+        } catch (SQLException e) {
+            logger.error("Error SQL Exception: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error Interno Reporte Conciso: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error al filtrar datos Reporte Conciso: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error Interno Reporte Conciso: " + e.getMessage());
+        }
+    }
+
+
+
+
+
+
 
     private FiltrosRequestDB mapToFiltrosRequest(Map<String, Object> filtros) {
         FiltrosRequestDB request = new FiltrosRequestDB();
@@ -75,4 +118,5 @@ public class DatabaseQueryController {
         ? list.stream().filter(String.class::isInstance).map(String.class::cast).toList()
         : List.of();
     }
+
 }
