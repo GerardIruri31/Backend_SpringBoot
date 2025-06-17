@@ -98,14 +98,14 @@ public class ExcelService {
                     String columnName = columns.get(col);
                     Object value = rowData.get(columns.get(col));
                     if (value != null) {
-                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName)) {
+                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName) || "PromViews".equalsIgnoreCase(columnName) || "PromInteracciones".equalsIgnoreCase(columnName)) {
                             if (value instanceof Number) {
                                 cell.setCellValue(((Number) value).doubleValue());
                                 cell.setCellStyle(numericStyle);
                             }
                         }
 
-
+                
                         // Si la columna es EXACTAMENTE “Engagement rate”, la tratamos como PORCENTAJE
                         else if ("Engagement rate".equalsIgnoreCase(columnName)) {
                             if (value instanceof Number) {
@@ -163,6 +163,13 @@ public class ExcelService {
             // Ajustar automáticamente el ancho de las columnas
             final int MAX_COLUMN_WIDTH = 65280; 
             for (int col = 0; col < columns.size(); col++) {
+                String columnName = columns.get(col).trim();
+                if ("Author Code".equalsIgnoreCase(columnName)) {
+                    // En POI, cada “carácter estándar” mide 256 unidades
+                    int anchoFijoSeis = 25 * 256;
+                    // Fija la columna col al ancho deseado:
+                    sheet.setColumnWidth(col, anchoFijoSeis);
+                } else {
                 sheet.autoSizeColumn(col);
 
                 // Obtenemos el ancho calculado
@@ -176,6 +183,7 @@ public class ExcelService {
                 }
                 // Establecemos el nuevo ancho
                 sheet.setColumnWidth(col, newWidth);
+                }
             }
 
             // Ajustar el alto de las filas (por defecto, desde la 1 hasta la última)

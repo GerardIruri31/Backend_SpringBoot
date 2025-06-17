@@ -833,7 +833,9 @@ public class TiktokMetricasRepo {
                             WHEN (m.max_prom_interacciones - m.min_prom_interacciones) = 0 THEN 0
                             ELSE (e.prom_interacciones - m.min_prom_interacciones) / (m.max_prom_interacciones - m.min_prom_interacciones)
                         END
-                    , 2) AS Score_Scene
+                    , 2) AS Score_Scene,
+                    ROUND(e.prom_numviews,0)                             AS PromViews,
+                    ROUND(e.prom_interacciones,0)                        AS PromInteracciones
                 FROM agrupado e
                 CROSS JOIN maxmintotal m
                 LEFT JOIN m_autora a    ON e.codautora = a.codautora
