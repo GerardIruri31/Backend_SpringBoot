@@ -47,10 +47,23 @@ public class ExcelUploadRenderer {
                     headers.add(cell.getStringCellValue().trim());
                 }
             }
-
             String tableName ="";
             List<String> conflicts = new ArrayList<>();
-            if (headers.contains("codautora")) {
+
+            // PERMITE UPLOAD DE PLANTILLA EXCEL DE MAESTRA DE MANTENIMIENTO POSTMETA AUTHOR
+            if (headers.contains("codmes") && headers.contains("codautora")) {
+                tableName = "m_metapostautora";
+                conflicts.add("codautora");
+                conflicts.add("codmes");
+            }
+
+            else if (headers.contains("codmes") && headers.contains("codlibro")) {
+                tableName = "m_metapostlibro";
+                conflicts.add("codlibro");
+                conflicts.add("codmes");
+            }
+
+            else if (headers.contains("codautora")) {
                 tableName = "m_autora";
                 conflicts.add("codautora");
             }
@@ -111,7 +124,7 @@ public class ExcelUploadRenderer {
                         record.put(header, fechaParseada); // Guarda la fecha en formato LocalDate
                     } 
                     
-                    else if ("numpostemeta".equalsIgnoreCase(header)) {
+                    else if ("numpostemeta".equalsIgnoreCase(header) || "numposteometa".equalsIgnoreCase(header)) {
                         if (cell.getCellType() == CellType.NUMERIC) {
                             // Si la celda es numérica, obtener el valor directamente
                             record.put(header, (int) cell.getNumericCellValue());
@@ -127,16 +140,18 @@ public class ExcelUploadRenderer {
                             record.put(header, 0); // Si es otro tipo de celda, asignar 0
                         }
                     }
-
-
-
                     else {
                         // Obtiene la celda como String
                         String cellValue = getCellValueAsString(cell).trim();
                         record.put(header, cellValue);
                     }
-                    }
-                records.add(record);
+                }
+                boolean tieneNulos = record.values().stream()
+                        .anyMatch(v -> v == null || (v instanceof String && ((String) v).trim().isEmpty()));
+
+                if (!tieneNulos) {
+                    records.add(record);  // ✅ solo agrega si todas las claves tienen valor
+                }
             }
 
             response.put("table", tableName);

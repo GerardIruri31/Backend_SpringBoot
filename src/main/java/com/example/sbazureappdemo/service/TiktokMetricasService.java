@@ -1,5 +1,10 @@
 package com.example.sbazureappdemo.service;
 import com.example.sbazureappdemo.AUTHORGRAPHS.AuthorGraphsRenderer;
+import com.example.sbazureappdemo.AUTHORGRAPHS.dto.EfectividadAutorMetaDTO;
+import com.example.sbazureappdemo.AUTHORGRAPHS.dto.RegistroMesAutoraDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.BookGraphsRequestDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.EfectividadBookMetaDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.RegistroMesLibroDTO;
 import com.example.sbazureappdemo.DBQUERY.FiltrosRequestDB;
 import com.example.sbazureappdemo.PAGRAPHS.PaGraphsRenderer;
 import com.example.sbazureappdemo.model.TiktokMetricas;
@@ -29,7 +34,7 @@ public class TiktokMetricasService {
     }
     
     // Guarda una lista de registros de métricas de TikTok en la base de datos.
-    // Utiliza el método `saveAll` del "repo" para insertar múltiples registros de manera eficiente.
+    // Utiliza el metodo `saveAll` del "repo" para insertar múltiples registros de manera eficiente.
     public void saveRegistries(List<TiktokMetricas> registros) {
         repo.saveAll(registros);
     }
@@ -108,5 +113,30 @@ public class TiktokMetricasService {
         logger.info("Inicio del proceso DB Query Reporte Conciso");
         return repo.reporteConcisoConnectionV2(request);
     }
+
+
+    public List<RegistroMesAutoraDTO> authorsPerMonth(AuthorGraphsRenderer filtros) {
+        logger.info("Inicio del proceso data authors per month");
+        return repo.dataAuthorsPerMonth(filtros);
+    }
+
+    // SERVICIO PARA ENDPOINT EFECTIVIDAD POR AUTHOR POR MES
+    public List<EfectividadAutorMetaDTO> effectAuthorsPerMonth(AuthorGraphsRenderer filtros) {
+        logger.info("Inicio del proceso efectividad authors per month");
+        return repo.effectDataAuthorsPerMonth(filtros);
+    }
+
+    public List<RegistroMesLibroDTO> booksPerMonth(BookGraphsRequestDTO filtros) {
+        logger.info("Inicio del proceso data books per month");
+        return repo.dataBooksPerMonth(filtros);
+    }
+
+    public List<EfectividadBookMetaDTO> effectBooksPerMonth(BookGraphsRequestDTO filtros) {
+        logger.info("Inicio del proceso efectividad books per month");
+        return repo.effectivenessBooksPerMonth(filtros);
+    }
+
+
+
 
 }

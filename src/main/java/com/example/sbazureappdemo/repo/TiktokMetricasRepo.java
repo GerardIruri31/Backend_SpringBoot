@@ -1,9 +1,15 @@
 package com.example.sbazureappdemo.repo;
 import com.example.sbazureappdemo.AUTHORGRAPHS.AuthorGraphsRenderer;
+import com.example.sbazureappdemo.AUTHORGRAPHS.dto.EfectividadAutorMetaDTO;
+import com.example.sbazureappdemo.AUTHORGRAPHS.dto.RegistroMesAutoraDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.BookGraphsRequestDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.EfectividadBookMetaDTO;
+import com.example.sbazureappdemo.BOOKGRAPHS.dto.RegistroMesLibroDTO;
 import com.example.sbazureappdemo.DBQUERY.FiltrosRequestDB;
 import com.example.sbazureappdemo.PAGRAPHS.PaGraphsRenderer;
 import com.example.sbazureappdemo.model.TiktokMetricas;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -308,7 +314,9 @@ public class TiktokMetricasRepo {
             return "CURRENT_DATE"; // Usa CURRENT_DATE para fechas
         } else if (col.equals("horacreacionregistro") || col.equals("horaactualizacionregistro")) {
             return "CURRENT_TIME AT TIME ZONE 'America/Lima'"; // Usa CURRENT_TIME AT TIME ZONE 'America/Lima'
-        } else {
+        } else if (col.equalsIgnoreCase("codmes")) {   // 👈 CAMBIO
+            return "INITCAP(?)"; }
+        else {
             return "?"; // Para las demás columnas usa valores dinámicos
         }
     }).collect(Collectors.joining(", "));
@@ -324,6 +332,8 @@ public class TiktokMetricasRepo {
                                         return col + " = CURRENT_DATE"; // Actualiza con la fecha actual
                                     } else if (col.equals("horaactualizacionregistro")) {
                                         return col + " = CURRENT_TIME AT TIME ZONE 'America/Lima'"; // Actualiza con la hora actual
+                                    } else if (col.equals("codmes")) {
+                                        return col + " = initcap(EXCLUDED." + col + ")"; // ✅ aplica INITCAP solo a codmes
                                     } else {
                                         return col + " = EXCLUDED." + col; // Asegura que las claves de conflicto también se actualicen
                                     }
@@ -371,7 +381,7 @@ public class TiktokMetricasRepo {
                         }
                     } 
                     else {
-                        ps.setObject(index, value); // Asignar valores normales
+                        ps.setObject(index, value);
                     }
                 } catch (ParseException e) {
                     logger.error("❌ Error al parsear la fecha: " + value);
@@ -1017,5 +1027,339 @@ public class TiktokMetricasRepo {
         return List.of();
     }
     }
-    
+
+
+    public List<RegistroMesAutoraDTO> dataAuthorsPerMonth(AuthorGraphsRenderer filtros) {
+        String fechaInicio = filtros.getStartDate();
+        String fechaFin = filtros.getFinishDate();
+        List<String> autoras = filtros.getAuthorList();
+        if (autoras == null || autoras.isEmpty()) {
+            throw new IllegalArgumentException("La lista de autoras no puede estar vacía.");
+        }
+        String inClause = autoras.stream()
+                .map(a -> "?")
+                .collect(Collectors.joining(",", "(", ")"));
+        String sql = String.format("""
+        SELECT R.mes, R.codautora,
+               CASE 
+                   WHEN au.nbautora IS NULL AND au.apeautora IS NULL THEN 'sin nombre'
+                   ELSE COALESCE(au.nbautora, '') || CHR(10) || COALESCE(au.apeautora, '')
+               END AS nbrAutora,
+               R.promNumviews, R.promInteraction, R.promNumengagement
+        FROM (
+            SELECT to_char(A.fecpublicacion, 'Mon-YY') AS mes,
+                   A.codautora,
+                   COUNT(A.codpublicacion) AS ctdPublicaciones,
+                   ROUND(AVG(A.numviews), 2)        AS promNumviews,
+                   ROUND(AVG(A.numengagement), 2)   AS promNumengagement,
+                   ROUND(AVG(A.numinteractions), 2) AS promInteraction
+            FROM (
+                SELECT mp.codpublicacion, mp.codautora, mp.fecpublicacion, mp.horapublicacion,
+                       mp.numviews, mp.numengagement, mp.numinteractions
+                FROM h_metricapublicacion mp
+                INNER JOIN (
+                    SELECT mpint.codpublicacion,
+                           MAX(mpint.fecreacionregistro + mpint.horacreacionregistro) AS max_fecreacionregistro
+                    FROM h_metricapublicacion mpint
+                    WHERE mpint.fecpublicacion BETWEEN ? AND ?
+                      AND mpint.codautora IN %s
+                    GROUP BY mpint.codpublicacion
+                ) base
+                  ON mp.codpublicacion = base.codpublicacion
+                 AND (mp.fecreacionregistro + mp.horacreacionregistro) = base.max_fecreacionregistro
+                WHERE mp.numviews >= 100
+            ) A
+            GROUP BY to_char(A.fecpublicacion, 'Mon-YY'), A.codautora
+        ) R
+        LEFT JOIN m_autora au
+          ON R.codautora = au.codautora
+        """, inClause);
+
+        List<Object> params = new ArrayList<>();
+        params.add(java.sql.Date.valueOf(fechaInicio)); // BETWEEN ? (inicio)
+        params.add(java.sql.Date.valueOf(fechaFin));    // BETWEEN ? (fin)
+        params.addAll(autoras);                          // IN (?, ?, ...)
+
+        return jdbc.query(sql, params.toArray(), (rs, i) -> {
+            RegistroMesAutoraDTO r = new RegistroMesAutoraDTO();
+            r.setMes(rs.getString("mes"));
+            r.setCodautora(rs.getString("codautora"));
+            r.setNbrAutora(rs.getString("nbrAutora"));
+            r.setPromNumviews(rs.getDouble("promNumviews"));
+            r.setPromInteraction(rs.getDouble("promInteraction"));
+            r.setPromNumengagement(rs.getDouble("promNumengagement"));
+            return r;
+        });
+    }
+
+
+
+
+    // CONEXIÓN A BASE DE DATOS PARA ENDPOINT EFECTIVIDAD POR AUTHOR POR MES
+    public List<EfectividadAutorMetaDTO> effectDataAuthorsPerMonth(AuthorGraphsRenderer filtros) {
+        String fechaInicio = filtros.getStartDate();
+        String fechaFin = filtros.getFinishDate();
+        List<String> autoras = filtros.getAuthorList();
+        if (autoras == null || autoras.isEmpty()) {
+            throw new IllegalArgumentException("La lista de autoras no puede estar vacía.");
+        }
+
+        String inClause = autoras.stream()
+                .map(a -> "?")
+                .collect(Collectors.joining(",", "(", ")"));
+
+        String sql = String.format("""
+        SELECT
+            T.codautora,
+            CASE\s
+                            WHEN T.nbautora IS NULL AND T.apeautora IS NULL\s
+                                THEN 'sin nombre'
+                            ELSE COALESCE(T.nbautora, '') || CHR(10) || COALESCE(T.apeautora, '')
+                        END AS nbautora,
+            T.codmes,
+            T.numposteometa,
+            COALESCE(R.ctdPublicaciones,0) AS numposteoreal,
+            ROUND(
+                (CAST(COALESCE(R.ctdPublicaciones,0) AS NUMERIC) /
+                 CAST(T.numposteometa AS NUMERIC)) * 100, 2
+            ) AS eficacia
+        FROM (
+            SELECT ma.codautora, a.nbautora,a.apeautora, ma.codmes, ma.numposteometa
+            FROM m_metapostautora ma
+            INNER JOIN m_autora a ON ma.codautora = a.codautora
+            AND ma.codmes IN (
+                SELECT to_char(mes, 'Mon-YY')
+                FROM generate_series(
+                    date_trunc('month', ?::date),
+                    date_trunc('month', ?::date),
+                    interval '1 month'
+                ) AS mes
+            )
+            WHERE ma.codautora IN %s
+        ) T
+        LEFT JOIN (
+            SELECT to_char(A.fecpublicacion, 'Mon-YY') AS codmes,
+                   A.codautora,
+                   COUNT(A.codpublicacion) AS ctdPublicaciones
+            FROM (
+                SELECT mp.codpublicacion, mp.codautora, mp.fecpublicacion,
+                       mp.horapublicacion, mp.numreposts
+                FROM h_metricapublicacion mp
+                INNER JOIN (
+                    SELECT mpint.codpublicacion,
+                           MAX(mpint.fecreacionregistro + mpint.horacreacionregistro) AS max_fecreacionregistro
+                    FROM h_metricapublicacion mpint
+                    WHERE mpint.fecpublicacion BETWEEN ? AND ?
+                      AND mpint.codautora IN %s
+                    GROUP BY mpint.codpublicacion
+                ) base
+                ON mp.codpublicacion = base.codpublicacion
+                AND (mp.fecreacionregistro + mp.horacreacionregistro) = base.max_fecreacionregistro
+                WHERE mp.numviews >= 100
+            ) A
+            GROUP BY to_char(A.fecpublicacion, 'Mon-YY'), A.codautora
+        ) R
+        ON T.codautora = R.codautora
+        AND T.codmes = R.codmes
+        """, inClause, inClause);
+
+        // Parámetros en orden de aparición en los "?"
+        List<Object> params = new ArrayList<>();
+        params.add(Date.valueOf(fechaInicio));  // para ?::date inicio
+        params.add(Date.valueOf(fechaFin));     // para ?::date fin
+        params.addAll(autoras);                 // IN (?, ?, ?)
+        params.add(Date.valueOf(fechaInicio));  // BETWEEN ? (inicio)
+        params.add(Date.valueOf(fechaFin));     // BETWEEN ? (fin)
+        params.addAll(autoras);                 // IN (?, ?, ?)
+
+        return jdbc.query(sql, params.toArray(), (rs, rowNum) -> {
+            EfectividadAutorMetaDTO dto = new EfectividadAutorMetaDTO();
+            dto.setCodautora(rs.getString("codautora"));
+            dto.setNbautora(rs.getString("nbautora"));
+            dto.setCodmes(rs.getString("codmes"));
+            dto.setNumposteometa(rs.getInt("numposteometa"));
+            dto.setNumposteoreal(rs.getInt("numposteoreal"));
+            dto.setEficacia(rs.getDouble("eficacia"));
+            return dto;
+        });
+    }
+
+
+
+    public List<RegistroMesLibroDTO> dataBooksPerMonth(BookGraphsRequestDTO filtros) {
+        String fechaInicio = filtros.getStartDate();
+        String fechaFin    = filtros.getFinishDate();
+        List<String> libros = filtros.getBookList(); // códigos de libro (p.ej., "DI", "DT")
+
+        if (libros == null || libros.isEmpty()) {
+            throw new IllegalArgumentException("La lista de libros no puede estar vacía.");
+        }
+
+        // Construimos el IN (?, ?, ...)
+        String inClause = libros.stream()
+                .map(a -> "?")
+                .collect(Collectors.joining(",", "(", ")"));
+
+        // Query parametrizada (basada en tu SQL de libros)
+        String sql = String.format("""
+        SELECT R.mes, R.codlibro,
+               CASE 
+                   WHEN lb.deslibro IS NULL THEN 'sin nombre'
+                   ELSE COALESCE(lb.deslibro, '')
+               END AS deslibro,
+               R.promNumviews, R.promInteraction, R.promNumengagement
+        FROM (
+            SELECT to_char(A.fecpublicacion, 'Mon-YY') AS mes,
+                   A.codlibro,
+                   COUNT(A.codpublicacion)                AS ctdPublicaciones,
+                   ROUND(AVG(A.numviews),        2)       AS promNumviews,
+                   ROUND(AVG(A.numengagement),   2)       AS promNumengagement,
+                   ROUND(AVG(A.numinteractions), 2)       AS promInteraction
+            FROM (
+                SELECT mp.codpublicacion, mp.codlibro, mp.fecpublicacion, mp.horapublicacion,
+                       mp.numviews, mp.numengagement, mp.numinteractions
+                FROM h_metricapublicacion mp
+                INNER JOIN (
+                    SELECT mpint.codpublicacion,
+                           MAX(mpint.fecreacionregistro + mpint.horacreacionregistro) AS max_fecreacionregistro
+                    FROM h_metricapublicacion mpint
+                    WHERE mpint.fecpublicacion BETWEEN ? AND ?
+                      AND mpint.codlibro IN %s
+                    GROUP BY mpint.codpublicacion
+                ) base
+                  ON mp.codpublicacion = base.codpublicacion
+                 AND (mp.fecreacionregistro + mp.horacreacionregistro) = base.max_fecreacionregistro
+                WHERE mp.numviews >= 100
+            ) A
+            GROUP BY to_char(A.fecpublicacion, 'Mon-YY'), A.codlibro
+        ) R
+        LEFT JOIN m_libro lb
+          ON R.codlibro = lb.codlibro
+        """, inClause);
+
+        // Orden de parámetros: fechas + lista IN
+        List<Object> params = new ArrayList<>();
+        params.add(java.sql.Date.valueOf(fechaInicio)); // BETWEEN ? (inicio)
+        params.add(java.sql.Date.valueOf(fechaFin));    // BETWEEN ? (fin)
+        params.addAll(libros);                           // IN (?, ?, ...)
+
+        return jdbc.query(sql, params.toArray(), (rs, i) -> {
+            RegistroMesLibroDTO r = new RegistroMesLibroDTO();
+            r.setMes(rs.getString("mes"));
+            r.setCodlibro(rs.getString("codlibro"));
+            r.setDeslibro(rs.getString("deslibro"));
+            r.setPromNumviews(rs.getDouble("promNumviews"));
+            r.setPromInteraction(rs.getDouble("promInteraction"));
+            r.setPromNumengagement(rs.getDouble("promNumengagement"));
+            return r;
+        });
+    }
+
+
+    public List<EfectividadBookMetaDTO> effectivenessBooksPerMonth(BookGraphsRequestDTO filtros) {
+        String fechaInicio = filtros.getStartDate();   // "YYYY-MM-DD"
+        String fechaFin    = filtros.getFinishDate();  // "YYYY-MM-DD"
+        List<String> libros = filtros.getBookList();   // p.ej.: ["SC","SR"]
+
+        if (libros == null || libros.isEmpty()) {
+            throw new IllegalArgumentException("La lista de libros no puede estar vacía.");
+        }
+
+        // IN (?, ?, ...)
+        String inClause = libros.stream()
+                .map(x -> "?")
+                .collect(Collectors.joining(",", "(", ")"));
+
+        String sql = String.format("""
+        SELECT
+            T.codlibro,
+            T.deslibro,
+            T.codmes,
+            T.numposteometa,
+            COALESCE(R.ctdPublicaciones, 0) AS numposteoreal,
+            ROUND(
+                (CAST(COALESCE(R.ctdPublicaciones,0) AS NUMERIC) / CAST(T.numposteometa AS NUMERIC)) * 100,
+                2
+            ) AS eficacia
+        FROM (
+            SELECT
+                ma.codlibro,
+                lb.deslibro,
+                ma.codmes,
+                ma.numposteometa
+            FROM m_metapostlibro ma
+            INNER JOIN m_libro lb
+                ON ma.codlibro = lb.codlibro
+            AND ma.codmes IN (
+                SELECT to_char(mes, 'Mon-YY')
+                FROM generate_series(
+                    date_trunc('month', ?::date),
+                    date_trunc('month', ?::date),
+                    interval '1 month'
+                ) AS mes
+            )
+            WHERE ma.codlibro IN %s
+        ) T
+        LEFT JOIN (
+            SELECT
+                to_char(A.fecpublicacion, 'Mon-YY') AS codmes,
+                A.codlibro,
+                COUNT(A.codpublicacion) AS ctdPublicaciones
+            FROM (
+                SELECT
+                    mp.codpublicacion,
+                    mp.codlibro,
+                    mp.fecpublicacion,
+                    mp.horapublicacion,
+                    mp.numreposts
+                FROM h_metricapublicacion mp
+                INNER JOIN (
+                    SELECT
+                        mpint.codpublicacion,
+                        MAX(mpint.fecreacionregistro + mpint.horacreacionregistro) AS max_fecreacionregistro
+                    FROM h_metricapublicacion mpint
+                    WHERE mpint.fecpublicacion BETWEEN ? AND ?
+                      AND mpint.codlibro IN %s
+                    GROUP BY mpint.codpublicacion
+                ) base
+                    ON mp.codpublicacion = base.codpublicacion
+                   AND (mp.fecreacionregistro + mp.horacreacionregistro) = base.max_fecreacionregistro
+                WHERE mp.numviews >= 100
+            ) A
+            GROUP BY to_char(A.fecpublicacion, 'Mon-YY'), A.codlibro
+        ) R
+          ON T.codlibro = R.codlibro
+         AND T.codmes = R.codmes
+        """, inClause, inClause);
+
+        List<Object> params = new ArrayList<>();
+        params.add(java.sql.Date.valueOf(fechaInicio)); // generate_series start
+        params.add(java.sql.Date.valueOf(fechaFin));    // generate_series end
+        params.addAll(libros);                           // IN (metapostlibro)
+        params.add(java.sql.Date.valueOf(fechaInicio)); // BETWEEN start
+        params.add(java.sql.Date.valueOf(fechaFin));    // BETWEEN end
+        params.addAll(libros);                           // IN (subquery métricas)
+
+        return jdbc.query(sql, params.toArray(), (rs, i) -> {
+            EfectividadBookMetaDTO dto = new EfectividadBookMetaDTO();
+            dto.setCodlibro(rs.getString("codlibro"));
+            dto.setDeslibro(rs.getString("deslibro"));
+            dto.setCodmes(rs.getString("codmes"));
+            dto.setNumposteometa(rs.getInt("numposteometa"));
+            dto.setNumposteoreal(rs.getInt("numposteoreal"));
+            dto.setEficacia(rs.getDouble("eficacia"));
+            return dto;
+        });
+    }
+
+
+
+
+
+
+
+
+
+
+
 }

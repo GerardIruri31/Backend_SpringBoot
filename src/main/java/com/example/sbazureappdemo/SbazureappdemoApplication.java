@@ -9,7 +9,6 @@ import org.springframework.context.annotation.ComponentScan;
 // Marca la clase principal de la app SpringBoot
 @SpringBootApplication
 // Asegura que Spring escanee todos los componentes (Controller, Service, etc) en este paquete
-@ComponentScan(basePackages = "com.example.sbazureappdemo") 
 
 public class SbazureappdemoApplication {
 

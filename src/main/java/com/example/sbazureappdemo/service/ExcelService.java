@@ -17,13 +17,46 @@ import java.util.*;
 public class ExcelService {
     Logger logger = LoggerFactory.getLogger(TiktokMetricasService.class);
 
-    public byte[] downloadExcel(List<Map<String, Object>> data) throws IOException {
+    public byte[] downloadExcel(List<Map<String, Object>> olddata) throws IOException {
         // Obtiene los datos procesados 
         try {
-        if (data == null || data.isEmpty()) {
+        if (olddata == null || olddata.isEmpty()) {
             throw new IllegalArgumentException("⚠️ No hay datos para exportar a Excel.");
         }
-
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (Map<String, Object> fila : olddata) {
+            Map<String, Object> nuevaFila = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : fila.entrySet()) {
+                String clave = entry.getKey();
+                Object valor = entry.getValue();
+                switch (clave.toLowerCase()) {
+                    case "author_name":
+                        nuevaFila.put("Author Name", valor);
+                        break;
+                    case "book":
+                        nuevaFila.put("Book Name", valor);
+                        break;
+                    case "scene_code":
+                        nuevaFila.put("Scene Code", valor);
+                        break;
+                    case "scene":
+                        nuevaFila.put("Scene Name", valor);
+                        break;
+                    case "score_scene":
+                        nuevaFila.put("Scene Score", valor);
+                        break;
+                    case "promviews":
+                        nuevaFila.put("Average Views", valor);
+                        break;
+                    case "prominteracciones":
+                        nuevaFila.put("Average Interactions", valor);
+                        break;
+                    default:
+                        nuevaFila.put(clave, valor);
+                }
+            }
+            data.add(nuevaFila); // Aquí está el cambio
+        }
         //logger.info("📊 Datos recibidos en ExcelService: " + data);
         // Usa Apache POI para crear y llenar un archivo Excel
         try (XSSFWorkbook workbook = new XSSFWorkbook();
@@ -82,13 +115,6 @@ public class ExcelService {
             numericStyle.setAlignment(HorizontalAlignment.CENTER);
             numericStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
-
-            // === Estilo PORCENTAJE ENTERO (0%) para "Engagement rate" ===
-            CellStyle porcentajeStyle = workbook.createCellStyle();
-            porcentajeStyle.setDataFormat(format.getFormat("0.00\\%"));  
-            porcentajeStyle.setAlignment(HorizontalAlignment.CENTER);
-            porcentajeStyle.setVerticalAlignment(VerticalAlignment.CENTER);
-
             // Añadir los datos al Excel
             int rowIndex = 1; // La fila 0 es para cabeceras
             for (Map<String, Object> rowData : data) {
@@ -98,32 +124,11 @@ public class ExcelService {
                     String columnName = columns.get(col);
                     Object value = rowData.get(columns.get(col));
                     if (value != null) {
-                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName) || "PromViews".equalsIgnoreCase(columnName) || "PromInteracciones".equalsIgnoreCase(columnName)) {
+
+                        if ("Views".equalsIgnoreCase(columnName) || "Likes".equalsIgnoreCase(columnName) || "Comments".equalsIgnoreCase(columnName) || "Reposted".equalsIgnoreCase(columnName) || "Saves".equalsIgnoreCase(columnName) || "Engagement rate".equalsIgnoreCase(columnName) || "Interactions".equalsIgnoreCase(columnName) || "Number of Hashtags".equalsIgnoreCase(columnName)) {
                             if (value instanceof Number) {
                                 cell.setCellValue(((Number) value).doubleValue());
                                 cell.setCellStyle(numericStyle);
-                            }
-                        }
-
-                
-                        // Si la columna es EXACTAMENTE “Engagement rate”, la tratamos como PORCENTAJE
-                        else if ("Engagement rate".equalsIgnoreCase(columnName)) {
-                            if (value instanceof Number) {
-                                double raw = ((Number) value).doubleValue();
-                                // POI espera que si queremos 43 %, la celda contenga 0.43
-                                cell.setCellValue(raw);  
-                                cell.setCellStyle(porcentajeStyle);
-                            } else {
-                                // Si viene como String, intentamos parsear
-                                try {
-                                    double raw = Double.parseDouble(value.toString());
-                                    cell.setCellValue(raw);
-                                    cell.setCellStyle(porcentajeStyle);
-                                } catch (NumberFormatException ex) {
-                                    // Si no se puede parsear, lo dejamos como texto para evitar excepción
-                                    cell.setCellValue(value.toString());
-                                    cell.setCellStyle(contenidoStyle);
-                                }
                             }
                         }
                         // Si la columna es "Date posted" o "Tracking date"
@@ -163,13 +168,6 @@ public class ExcelService {
             // Ajustar automáticamente el ancho de las columnas
             final int MAX_COLUMN_WIDTH = 65280; 
             for (int col = 0; col < columns.size(); col++) {
-                String columnName = columns.get(col).trim();
-                if ("Author Code".equalsIgnoreCase(columnName)) {
-                    // En POI, cada “carácter estándar” mide 256 unidades
-                    int anchoFijoSeis = 25 * 256;
-                    // Fija la columna col al ancho deseado:
-                    sheet.setColumnWidth(col, anchoFijoSeis);
-                } else {
                 sheet.autoSizeColumn(col);
 
                 // Obtenemos el ancho calculado
@@ -183,7 +181,6 @@ public class ExcelService {
                 }
                 // Establecemos el nuevo ancho
                 sheet.setColumnWidth(col, newWidth);
-                }
             }
 
             // Ajustar el alto de las filas (por defecto, desde la 1 hasta la última)
